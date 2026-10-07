@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trgochess-conv"
+version = "0.1.0"
+description = "五子棋教学实验：教师分布蒸馏与历史对手池 PPO"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "torch>=2.2", "PyYAML>=6.0", "tensorboard>=2.16"]
+
+[tool.setuptools.packages.find]
+include = ["gomoku*"]
+
+[tool.setuptools.package-data]
+gomoku = ["native/*.c", "native/*.md", "static/*.html", "static/*.js", "static/*.css"]

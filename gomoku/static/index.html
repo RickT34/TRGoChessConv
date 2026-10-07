@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>五子棋 · 模型试棋室</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%232c6150'/%3E%3Ccircle cx='15' cy='15' r='8' fill='%231b2521'/%3E%3Ccircle cx='25' cy='25' r='8' fill='%23fff9ed'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/board.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<main>
+  <header class="page-header">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">●<i>●</i></span><div><div class="eyebrow">GOMOKU / RL LAB</div><h1>模型试棋室<span class="header-dot">.</span></h1></div></div>
+    <nav class="page-nav"><a class="active" href="/">人机对弈</a></nav>
+  </header>
+  <div class="workspace">
+    <section class="board-panel" aria-label="对弈区">
+      <div class="board-heading"><div><div class="eyebrow">PLAY & EXPLORE</div><h2 id="status" aria-live="polite">准备开始一局</h2></div><span id="turn-badge" class="badge">等待开始</span></div>
+      <p class="board-instruction" id="instruction">选择一个模型，点击「开始新对局」。</p>
+      <div class="board-wrap"><svg id="board" viewBox="0 0 640 640" role="group" aria-label="五子棋棋盘"></svg><div class="board-placeholder" id="placeholder">你的下一手，会让模型怎么应对？</div></div>
+      <div class="board-footer"><div class="legend"><span><i class="stone black"></i><span id="black-label">黑棋 · 先手</span></span><span><i class="stone white"></i><span id="white-label">白棋 · 后手</span></span></div><span id="move-count">第 0 手</span></div>
+      <div class="board-actions"><button id="undo" class="button secondary" disabled>↶ 悔一轮</button><label class="toggle"><input id="heatmap" type="checkbox"><span>显示落子概率</span></label><button id="export" class="text-button" disabled>导出棋谱 ↓</button></div>
+      <p class="heatmap-note" id="heatmap-note">连续五子或以上获胜，无禁手。末手以绿色圆环标记。</p>
+    </section>
+
+    <aside>
+      <section class="card settings">
+        <div class="section-heading"><h2>对局设置</h2><span class="section-number">01</span></div>
+        <label for="model">选择模型</label>
+        <div class="model-row"><select id="model"><option value="">正在读取模型…</option></select><button id="refresh" class="icon-button" title="刷新模型列表" aria-label="刷新模型列表">↻</button></div>
+        <label>你的执棋</label>
+        <div class="segmented" role="group" aria-label="你的执棋"><button class="selected" id="choose-black" aria-pressed="true"><i class="stone black"></i>执黑 · 先手</button><button id="choose-white" aria-pressed="false"><i class="stone white"></i>执白 · 后手</button></div>
+        <label for="mode">模型落子方式</label>
+        <select id="mode"><option value="greedy">最大概率 · 稳定比较</option><option value="sample">概率采样 · 观察变化</option><option value="minimax">Minimax + αβ · 神经网络评分</option></select>
+        <div id="search-fields" hidden>
+          <div class="form-pair">
+            <div><label for="search-depth">搜索深度（手）</label><input id="search-depth" type="number" min="1" max="6" step="1" value="2"></div>
+            <div><label for="search-time">软时限（秒）</label><input id="search-time" type="number" min="0" max="30" step="0.5" value="3"></div>
+          </div>
+          <label for="search-top-p">每层 Top-p（累计策略概率 %）</label>
+          <input id="search-top-p" type="number" min="1" max="100" step="1" value="90">
+          <p class="small muted">按合法落点的策略概率从高到低累加，达到阈值即停止；100% 搜索全部落点。额外保留一步成五和防五落点。</p>
+          <p class="small muted">一层是一手棋。至少完成一层，超时使用上一完整深度；0 秒表示不限时。需要带价值头的残差模型。</p>
+        </div>
+        <div id="seed-field" hidden><label for="seed">随机种子</label><input id="seed" type="number" min="0" max="4294967295" step="1" value="0"></div>
+        <button id="new-game" class="button primary" disabled>开始新对局 <span>↗</span></button>
+        <p class="small muted" id="settings-note">设置在开始新对局时生效。</p>
+      </section>
+
+      <section class="card analysis">
+        <div class="section-heading"><h2>最近一次 AI 决策</h2><span class="section-number">02</span></div>
+        <div id="analysis-empty" class="empty-state">AI 落子后，在这里查看它的选择。</div>
+        <div id="analysis-content" hidden>
+          <div class="decision-metrics"><div><span>实际落点</span><strong id="ai-coordinate">—</strong></div><div><span id="ai-score-label">落子概率</span><strong id="ai-probability">—</strong></div><div><span>推理耗时</span><strong id="ai-time">—</strong></div></div>
+          <p id="search-summary" class="small muted" hidden></p>
+          <div class="small muted candidate-label" id="candidate-label">当时最偏好的落点</div><ol id="candidates" class="candidates"></ol>
+        </div>
+        <p class="analysis-note" id="analysis-note">概率表示模型偏好，不代表获胜概率。</p>
+      </section>
+
+      <section class="card history-card">
+        <div class="section-heading"><h2>本局棋谱</h2><span class="section-number" id="history-count">00</span></div>
+        <div id="history" class="history"><div class="empty-state">棋盘上的每一次选择，都会留在这里。</div></div>
+      </section>
+    </aside>
+  </div>
+  <div id="message" role="alert" hidden></div>
+  <footer class="page-footer"><span>从一手棋，观察一个策略。</span><span>模型对局期间不训练 · 建议交换先后手比较</span></footer>
+</main>
+</body>
+</html>
