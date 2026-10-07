@@ -4,7 +4,7 @@
 
 规则为自由五子棋：连续五子及以上获胜，无禁手。默认 19×19。模型是 96 通道、20 个残差块的卷积网络，输出策略和价值。
 
-[试玩网址(在浏览器中计算神经网络)](https://rickt34.github.io/misc/gomoku-rnn/)
+[试玩网址(在浏览器中计算神经网络)](https://rickt34.github.io/misc/gomoku-cnn/)
 
 ## 技术路线
 
