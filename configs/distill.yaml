@@ -1,4 +1,5 @@
 command: imitate
+data_cache_mb: 4096
 data: data/c_teacher_distill
 output: runs/residual-distillation.pt
 log_dir: runs/tensorboard/distillation

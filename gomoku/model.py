@@ -42,8 +42,9 @@ class ActorCritic(nn.Module):
         return self.policy_head(features).squeeze(1), self.value_head(features).squeeze(1)
 
     def forward(self, states, return_values=False):
-        result = self.evaluate(states)
-        return result if return_values else result[0]
+        if return_values:
+            return self.evaluate(states)
+        return self.policy_head(self.trunk(states.float().unsqueeze(1))).squeeze(1)
 
     def distribution(self, states: torch.Tensor) -> Categorical:
         if (states.flatten(1) != 0).all(1).any():

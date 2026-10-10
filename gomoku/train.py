@@ -144,7 +144,8 @@ def expert(args):
 
 def move_batch(batch, device):
     if device.startswith('cuda'):
-        return tuple(t.pin_memory().to(device, non_blocking=True) for t in batch)
+        return tuple((t.pin_memory() if t.device.type == 'cpu' else t).to(device, non_blocking=True)
+                     for t in batch)
     return tuple(t.to(device) for t in batch)
 
 
@@ -172,7 +173,7 @@ def validate(model, dataset, args):
 
 
 def imitate(args):
-    dataset = ExpertDataset(args.data, args.validation_every)
+    dataset = ExpertDataset(args.data, args.validation_every, args.device, args.data_cache_mb)
     checkpoint = None
     if args.resume:
         model, checkpoint = load_policy(args.resume, args.device)
@@ -189,6 +190,7 @@ def imitate(args):
         start_epoch = restore(args, checkpoint, optimizer, 'imitate')
         seen = checkpoint['env_steps']
         best = checkpoint.get('best', best)
+    del checkpoint
     prepare_output(args, resolved)
     start_logging(args, start_epoch)
     for epoch in range(start_epoch, args.epochs):
@@ -226,7 +228,7 @@ def selfplay(args):
     model, checkpoint = load_policy(args.resume or args.checkpoint, args.device)
     if not isinstance(model, ActorCritic):
         raise ValueError('PPO 需要价值头，请先完成 imitate 蒸馏')
-    dataset = ExpertDataset(args.bc_data, args.validation_every) if args.bc_data else None
+    dataset = ExpertDataset(args.bc_data, args.validation_every, args.device, args.data_cache_mb) if args.bc_data else None
     size = checkpoint['size']
     if dataset and dataset.size != size:
         raise ValueError('模仿数据和模型的棋盘尺寸不同')
@@ -242,9 +244,10 @@ def selfplay(args):
     if args.resume:
         if 'history_pool' not in checkpoint:
             raise ValueError('训练断点缺少历史池，不能恢复历史对手训练')
-        pool.load_state_dict(checkpoint['history_pool'])
+        pool.load_state_dict(checkpoint.pop('history_pool'))
     else:
         pool.add(model, 0)
+    del checkpoint
     resolved = config(args, size=size, channels=model.channels, blocks=model.blocks,
                       dataset_sha256=dataset.fingerprint if dataset else None,
                       initial_checkpoint=args.checkpoint,
@@ -259,7 +262,7 @@ def selfplay(args):
         rollout = collect_history_games(model, pool, args.parallel_games, size, args.device,
             args.gamma, args.precision, args.history_probability, args.opening_moves,
             args.opening_radius, args.seed, update*args.parallel_games,
-            args.length_weight, args.length_scale)
+            args.length_weight, args.length_scale, args.history_inference)
         sync(args.device)
         count = len(rollout['actions'])
         batch_env_steps = rollout.get('environment_steps', count)
@@ -407,6 +410,8 @@ def build_parser():
             p.add_argument('--opening-moves', type=nonnegative, default=2)
             p.add_argument('--opening-radius', type=positive, default=3)
         if name in ('imitate', 'selfplay'):
+            p.add_argument('--data-cache-mb', type=nonnegative, default=1024,
+                           help='教师分片在训练设备上的 LRU 缓存上限 MiB；0 禁用')
             p.add_argument('--resume', help='完整训练断点；epochs/updates 表示总目标')
             p.add_argument('--batch-size', type=positive, default=256)
             p.add_argument('--lr', type=float, default=5e-4 if name == 'imitate' else 3e-5)
@@ -443,6 +448,8 @@ def build_parser():
             p.add_argument('--history-pool-size', type=positive, default=64)
             p.add_argument('--history-interval', type=positive, default=10)
             p.add_argument('--history-probability', type=probability, default=.85)
+            p.add_argument('--history-inference', choices=['auto', 'grouped', 'vmap'], default='auto',
+                           help='auto 在 CUDA 使用分桶 vmap，CPU 使用 grouped')
             p.add_argument('--length-weight', type=probability, default=.4)
             p.add_argument('--length-scale', type=positive, default=100)
         else:

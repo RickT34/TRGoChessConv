@@ -24,6 +24,9 @@ history_pool_size: 64
 history_interval: 10
 # 85% 的成对棋局均匀抽取历史快照，其余对抗当前模型。
 history_probability: 0.85
+history_inference: auto
+# 在训练设备缓存教师分片，减少每次 PPO 更新时重复读取和 CPU→GPU 传输。
+data_cache_mb: 4096
 opening_moves: 2
 opening_radius: 2
 bc_data: data/c_teacher_distill

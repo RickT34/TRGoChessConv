@@ -237,7 +237,8 @@ class PipelineTests(unittest.TestCase):
                 self.assertEqual(targets.ndim, 2)
                 self.assertTrue((targets[states.flatten(1) != 0] == 0).all())
             run('imitate', command='imitate', data=str(root/'data'), output=str(root/'initial.pt'),
-                channels=8, blocks=1, epochs=1, batch_size=16, device='cpu', deterministic=True)
+                channels=8, blocks=1, epochs=1, batch_size=16, device='cpu', deterministic=True,
+                data_cache_mb=0)
             config = read_yaml(root/'initial.config.yaml')
             self.assertEqual(config['metadata']['policy_target'], 'distribution')
             for name, resume in [('imitate_full', None), ('imitate_resumed', str(root/'initial.pt'))]:
@@ -252,6 +253,7 @@ class PipelineTests(unittest.TestCase):
             common = dict(command='selfplay', checkpoint=str(root/'initial.pt'), device='cpu',
                           deterministic=True, parallel_games=4, batch_size=32, ppo_epochs=2,
                           history_pool_size=2, history_interval=1, history_probability=.75,
+                          history_inference='vmap', data_cache_mb=1,
                           bc_data=str(root/'data'), bc_batch_size=16, save_every=1)
             for name, updates, resume in [('full', 3, None), ('part', 1, None),
                                           ('resumed', 3, str(root/'part.pt'))]:
